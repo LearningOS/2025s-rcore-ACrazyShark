@@ -34,7 +34,22 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
 /// HINT: You might reimplement it with virtual memory management.
 pub fn sys_trace(_trace_request: usize, _id: usize, _data: usize) -> isize {
     trace!("kernel: sys_trace");
-    -1
+    match _trace_request {
+        0 => {
+            let address = _id as *mut u8;
+            if check_address(address) {
+                
+            }
+            -1
+        },
+        1 => {
+            
+        },
+        2 =>{
+            -1
+        }
+        _ => -1
+    }
 }
 
 // YOUR JOB: Implement mmap.
