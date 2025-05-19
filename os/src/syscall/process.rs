@@ -1,11 +1,13 @@
 use crate::task::{current_user_token, exit_current_and_run_next, suspend_current_and_run_next};
-use crate::mm::{MapPermission, VirtAddr};
+use crate::mm::{MapPermission, VirtAddr, translated_refmut};
 use crate::task::{translate_read, translate_write, check_user_addr_range, get_syscall_count, insert_framed_area};
 // use crate::timer::{get_time_us};
-use crate::config::{PAGE_SIZE, PAGE_SIZE_BITS};
+use crate::config::{PAGE_SIZE};
 use crate::timer::get_time_us;
-use crate::mm::PageTable;
+// use crate::mm::PageTable;
 use crate::task::change_program_brk;
+
+
 
 #[repr(C)]
 #[derive(Debug)]
@@ -42,17 +44,18 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
     // }
     let time_us = get_time_us();
     let token = current_user_token();
-    let page_table = PageTable::from_token(token);
-    let va = VirtAddr::from(_ts as usize);
-    let ppn = page_table.translate(va.floor()).unwrap().ppn();
-    let offset = va.page_offset();
-    let phy_addr = (ppn.0 << PAGE_SIZE_BITS + offset) as *mut TimeVal;
-    unsafe {
-        *phy_addr = TimeVal {
-            sec: time_us / 1_000_000,
-            usec: time_us % 1_000_000,
-        };
-    }
+    // let page_table = PageTable::from_token(token);
+    // let va = VirtAddr::from(_ts as usize);
+    // let ppn = page_table.translate(va.floor()).unwrap().ppn();
+    // let offset = va.page_offset();
+    // let phy_addr = (ppn.0 << PAGE_SIZE_BITS + offset) as *mut TimeVal;
+    let phy_addr = translated_refmut(token, _ts);
+
+    *phy_addr = TimeVal {
+        sec: time_us / 1_000_000,
+        usec: time_us % 1_000_000,
+    };
+
     0
 }
 
