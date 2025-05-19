@@ -190,7 +190,7 @@ impl TaskManager {
 
     /// read
     pub fn translate_read(&self, _id: usize) -> isize{
-        let mut inner = self.inner.exclusive_access();
+        let inner = self.inner.exclusive_access();
         let current = inner.current_task;
         let page_table = PageTable::from_token(inner.tasks[current].get_user_token());
         let va = VirtAddr::from(_id);
@@ -205,7 +205,7 @@ impl TaskManager {
 
     /// write
     pub fn translate_write(&self, _id: usize, value:u8){
-        let mut inner = self.inner.exclusive_access();
+        let inner = self.inner.exclusive_access();
         let current = inner.current_task;
         let page_table = PageTable::from_token(inner.tasks[current].get_user_token());
         let va = VirtAddr::from(_id);
@@ -218,6 +218,19 @@ impl TaskManager {
     }
 
 
+    /// record system count
+    fn record_syscall(&self, _id:usize){
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        inner.tasks[current].task_count[_id] += 1;
+    }
+    /// get system count
+    fn get_syscall(&self, _id:usize) -> isize{
+        let inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        let num = inner.tasks[current].task_count[_id] as isize;
+        num
+    }
 
 }
 
@@ -285,3 +298,14 @@ pub fn translate_read(_id: usize) -> isize {
 pub fn translate_write(_id: usize, value: u8){
     TASK_MANAGER.translate_write(_id, value);
 }
+
+/// record syscall count
+pub fn record_syscall_count(system_id:usize){
+    TASK_MANAGER.record_syscall(system_id);
+}
+
+/// get syscall count
+pub fn get_syscall_count(system_id:usize) -> isize{
+    let num = TASK_MANAGER.get_syscall(system_id);
+    num
+} 

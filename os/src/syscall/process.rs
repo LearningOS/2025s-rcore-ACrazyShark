@@ -1,6 +1,6 @@
 use crate::task::{change_program_brk, exit_current_and_run_next, suspend_current_and_run_next};
 use crate::mm::{MapPermission };
-use crate::task::{translate_read, translate_write, check_user_addr_range};
+use crate::task::{translate_read, translate_write, check_user_addr_range, record_syscall_count, get_syscall_count};
 
 #[repr(C)]
 #[derive(Debug)]
@@ -60,7 +60,8 @@ pub fn sys_trace(_trace_request: usize, _id: usize, _data: usize) -> isize {
             0
         },
         2 =>{
-            -1
+            let num = get_syscall_count(_id);
+            num
         }
         _ => -1
     }
