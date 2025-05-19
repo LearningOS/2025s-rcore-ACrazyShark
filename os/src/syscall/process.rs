@@ -1,5 +1,6 @@
-//! Process management syscalls
 use crate::task::{change_program_brk, exit_current_and_run_next, suspend_current_and_run_next};
+use crate::mm::{MapPermission };
+use crate::task::{translate_read, translate_write, check_user_addr_range};
 
 #[repr(C)]
 #[derive(Debug)]
@@ -36,14 +37,27 @@ pub fn sys_trace(_trace_request: usize, _id: usize, _data: usize) -> isize {
     trace!("kernel: sys_trace");
     match _trace_request {
         0 => {
-            let address = _id as *mut u8;
-            if check_address(address) {
-                
+            if !check_user_addr_range(
+                _id, 
+                MapPermission::R | MapPermission::U
+            ) {
+                return -1;
             }
-            -1
+
+            translate_read(_id)
+
         },
         1 => {
-            
+            if !check_user_addr_range(
+                _id as usize, 
+                MapPermission::W | MapPermission::U
+            ) {
+                return -1;
+            }
+
+            let value = (_data & 0xFF) as u8;
+            translate_write(_id, value);
+            0
         },
         2 =>{
             -1
@@ -55,12 +69,14 @@ pub fn sys_trace(_trace_request: usize, _id: usize, _data: usize) -> isize {
 // YOUR JOB: Implement mmap.
 pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
     trace!("kernel: sys_mmap NOT IMPLEMENTED YET!");
+
     -1
 }
 
 // YOUR JOB: Implement munmap.
 pub fn sys_munmap(_start: usize, _len: usize) -> isize {
     trace!("kernel: sys_munmap NOT IMPLEMENTED YET!");
+
     -1
 }
 /// change data segment size

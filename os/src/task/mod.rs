@@ -14,13 +14,19 @@ mod switch;
 #[allow(clippy::module_inception)]
 mod task;
 
+// use core::simd::usizex2;
+
+use crate::config::PAGE_SIZE_BITS;
 use crate::loader::{get_app_data, get_num_app};
 use crate::sync::UPSafeCell;
 use crate::trap::TrapContext;
+use crate::mm::{VirtAddr, PageTable, MapPermission};
+
 use alloc::vec::Vec;
 use lazy_static::*;
 use switch::__switch;
 pub use task::{TaskControlBlock, TaskStatus};
+
 
 pub use context::TaskContext;
 
@@ -155,8 +161,62 @@ impl TaskManager {
     }
 
 
-
     
+    /// check user address range is true or not 
+    pub fn check_user_addr_range(
+        &self, 
+        _id: usize, 
+        perm: MapPermission
+    ) -> bool {
+        let inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        let page_table = PageTable::from_token(inner.tasks[current].get_user_token());
+        
+        let va = VirtAddr::from(_id);
+        // check 
+        match page_table.translate(va.floor()) {
+            Some(pte) => {
+                let pte_perm: MapPermission = MapPermission::from_bits_truncate(pte.flags().bits() as u8);
+                if !pte_perm.contains(perm) {
+                    return false;
+                }
+            }
+            None => return false,
+        }
+        
+        true
+    }
+    
+
+    /// read
+    pub fn translate_read(&self, _id: usize) -> isize{
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        let page_table = PageTable::from_token(inner.tasks[current].get_user_token());
+        let va = VirtAddr::from(_id);
+        let offset = va.page_offset();
+        // how to know the physics address ?
+        let ppn = page_table.translate(va.floor())
+                .unwrap()
+                .ppn() ;
+        let pa = (ppn.0 << PAGE_SIZE_BITS + offset)  as *const u8;
+        unsafe { pa.read_volatile() as isize }
+    }
+
+    /// write
+    pub fn translate_write(&self, _id: usize, value:u8){
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        let page_table = PageTable::from_token(inner.tasks[current].get_user_token());
+        let va = VirtAddr::from(_id);
+        let offset = va.page_offset();
+        let ppn = page_table.translate(va.floor())
+                .unwrap()
+                .ppn() ;
+        let pa = (ppn.0 << PAGE_SIZE_BITS + offset) as *mut u8;
+        unsafe { pa.write_volatile(value);}
+    }
+
 
 
 }
@@ -207,4 +267,21 @@ pub fn current_trap_cx() -> &'static mut TrapContext {
 /// Change the current 'Running' task's program break
 pub fn change_program_brk(size: i32) -> Option<usize> {
     TASK_MANAGER.change_current_program_brk(size)
+}
+
+
+/// Check the user's address whether is currently
+pub fn check_user_addr_range(_id: usize, perm: MapPermission) -> bool {
+    TASK_MANAGER.check_user_addr_range(_id, perm)
+}
+
+/// read a value from user address
+pub fn translate_read(_id: usize) -> isize {
+    TASK_MANAGER.translate_read(_id)
+}
+
+
+/// write a value from user address
+pub fn translate_write(_id: usize, value: u8){
+    TASK_MANAGER.translate_write(_id, value);
 }

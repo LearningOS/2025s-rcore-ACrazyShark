@@ -12,6 +12,7 @@ use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::arch::asm;
+use core::u8;
 use lazy_static::*;
 use riscv::register::satp;
 
@@ -262,6 +263,8 @@ impl MemorySet {
             false
         }
     }
+
+
 }
 /// map area structure, controls a contiguous piece of virtual memory
 pub struct MapArea {
