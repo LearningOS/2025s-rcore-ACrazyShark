@@ -1,5 +1,7 @@
 //! Types related to task management
 
+use crate::config::SYSTEM_NUM;
+
 use super::TaskContext;
 
 /// The task control block (TCB) of a task.
@@ -9,6 +11,9 @@ pub struct TaskControlBlock {
     pub task_status: TaskStatus,
     /// The task context
     pub task_cx: TaskContext,
+
+    /// The system count
+    pub task_count: [usize; SYSTEM_NUM],
 }
 
 /// The status of a task
