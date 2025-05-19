@@ -110,6 +110,12 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
         "kernel:pid[{}] sys_get_time NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
+    let token = current_user_token();
+    let time = translated_refmut(token, _ts);
+    *time = TimeVal{
+        sec:
+        usec:
+    } ;
     -1
 }
 
