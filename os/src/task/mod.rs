@@ -16,7 +16,7 @@ mod task;
 
 // use core::simd::usizex2;
 
-use crate::config::PAGE_SIZE_BITS;
+// use crate::config::PAGE_SIZE;
 use crate::loader::{get_app_data, get_num_app};
 use crate::sync::UPSafeCell;
 use crate::trap::TrapContext;
@@ -29,6 +29,9 @@ pub use task::{TaskControlBlock, TaskStatus};
 
 
 pub use context::TaskContext;
+
+use crate::config::PAGE_SIZE_BITS;
+use crate::config::PAGE_SIZE;
 
 /// The task manager, where all the tasks are managed.
 ///
@@ -213,7 +216,7 @@ impl TaskManager {
         let ppn = page_table.translate(va.floor())
                 .unwrap()
                 .ppn() ;
-        let pa = (ppn.0 << PAGE_SIZE_BITS + offset) as *mut u8;
+        let pa = (ppn.0 << PAGE_SIZE + offset) as *mut u8;
         unsafe { pa.write_volatile(value);}
     }
 
@@ -231,7 +234,22 @@ impl TaskManager {
         let num = inner.tasks[current].task_count[_id] as isize;
         num
     }
+    /// insert framed area
+    fn insert_framed_area(&self, start: VirtAddr, end: VirtAddr, perm: MapPermission) {
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        inner.tasks[current].insert_framed_area(start, end, perm);
+    }
 
+
+    
+    // fn check_vpn_range(&self, start: VirtAddr, end: VirtAddr, perm: MapPermission) -> bool {
+    //     let mut inner = self.inner.exclusive_access();
+    //     let current = inner.current_task;
+    //     false
+    // }
+
+    
 }
 
 /// Run the first task in task list.
@@ -309,3 +327,15 @@ pub fn get_syscall_count(system_id:usize) -> isize{
     let num = TASK_MANAGER.get_syscall(system_id);
     num
 } 
+
+/// insert framed area
+pub fn insert_framed_area(
+    start: VirtAddr,
+    end: VirtAddr,
+    perm: MapPermission,
+) {
+    TASK_MANAGER.insert_framed_area(start, end, perm);
+}
+
+
+

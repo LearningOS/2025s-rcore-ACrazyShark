@@ -1,6 +1,11 @@
-use crate::task::{change_program_brk, exit_current_and_run_next, suspend_current_and_run_next};
-use crate::mm::{MapPermission };
-use crate::task::{translate_read, translate_write, check_user_addr_range, record_syscall_count, get_syscall_count};
+use crate::task::{current_user_token, exit_current_and_run_next, suspend_current_and_run_next};
+use crate::mm::{MapPermission, VirtAddr};
+use crate::task::{translate_read, translate_write, check_user_addr_range, get_syscall_count, insert_framed_area};
+// use crate::timer::{get_time_us};
+use crate::config::{PAGE_SIZE, PAGE_SIZE_BITS};
+use crate::timer::get_time_us;
+use crate::mm::PageTable;
+use crate::task::change_program_brk;
 
 #[repr(C)]
 #[derive(Debug)]
@@ -27,8 +32,28 @@ pub fn sys_yield() -> isize {
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TimeVal`] is splitted by two pages ?
 pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
-    trace!("kernel: sys_get_time");
-    -1
+    trace!("kernel: sys_get_time"); 
+    // let time_us = get_time_us();
+    // unsafe { 
+    //     *_ts = TimeVal {
+    //         sec: time_us / 1_000_000,
+    //         usec: time_us % 1_000_000,
+    //     };
+    // }
+    let time_us = get_time_us();
+    let token = current_user_token();
+    let page_table = PageTable::from_token(token);
+    let va = VirtAddr::from(_ts as usize);
+    let ppn = page_table.translate(va.floor()).unwrap().ppn();
+    let offset = va.page_offset();
+    let phy_addr = (ppn.0 << PAGE_SIZE_BITS + offset) as *mut TimeVal;
+    unsafe {
+        *phy_addr = TimeVal {
+            sec: time_us / 1_000_000,
+            usec: time_us % 1_000_000,
+        };
+    }
+    0
 }
 
 /// TODO: Finish sys_trace to pass testcases
@@ -70,16 +95,52 @@ pub fn sys_trace(_trace_request: usize, _id: usize, _data: usize) -> isize {
 // YOUR JOB: Implement mmap.
 pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
     trace!("kernel: sys_mmap NOT IMPLEMENTED YET!");
+    if (_port & !0x7) != 0 || (_port & 0x7) == 0 {
+        return -1;
+    }
+    if _start % PAGE_SIZE != 0 {
+        return -1;
+    }
+    let r = (_port & 0x1) != 0;
+    let w = (_port & 0x2) != 0;
+    let x = (_port & 0x4) != 0;
+    let mut perm = MapPermission::U;
+    if r {
+        perm |= MapPermission::R;
+    }
+    if w {
+        perm |= MapPermission::W;
+    }
+    if x {
+        perm |= MapPermission::X;
+    }
+    if _len == 0 {
+        return 0;
+    }
 
-    -1
+    let start_va = VirtAddr::from(_start);
+    let end_va = VirtAddr::from(_start + _len);
+
+    // check_vpn_range(start_va, end_va, perm);
+
+    insert_framed_area(
+        start_va,
+        end_va,
+        perm,
+    );
+
+    0
+    // -1
 }
 
 // YOUR JOB: Implement munmap.
 pub fn sys_munmap(_start: usize, _len: usize) -> isize {
     trace!("kernel: sys_munmap NOT IMPLEMENTED YET!");
-
+    
     -1
 }
+
+
 /// change data segment size
 pub fn sys_sbrk(size: i32) -> isize {
     trace!("kernel: sys_sbrk");
