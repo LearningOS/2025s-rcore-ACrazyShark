@@ -16,6 +16,7 @@ use core::u8;
 use lazy_static::*;
 use riscv::register::satp;
 
+
 extern "C" {
     fn stext();
     fn etext();
@@ -266,8 +267,15 @@ impl MemorySet {
 
 
 
-    pub fn check_vpn_range(&self, start_va: VirtAddr, end_va: VirtAddr) {
-        
+    pub fn check_vpn_range(&self, start_va: VirtAddr, end_va: VirtAddr) -> bool {
+        let token = self.token();
+        for vpn in VPNRange::new(start_va.floor(), end_va.ceil()) {
+            if find_pte(token, vpn) {
+                // find a existed page, return false
+                return false;
+            }
+        }
+        true
     }
 
 }
