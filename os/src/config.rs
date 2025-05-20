@@ -24,7 +24,7 @@ pub const MEMORY_END: usize = 0x88000000;
 
 
 /// INIT_PRIORITY
-pub const INIT_PRIORITY: usize = 16;
+pub const INIT_PRIORITY: usize = 8;
 
 ///BIG_STRIDE 
-pub const BIG_STRIDE: usize = 1 << 16;
+pub const BIG_STRIDE: usize = 1 << 8;
