@@ -155,13 +155,14 @@ pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
     if !start_va.aligned() {
         return -1;
     }
-    let end_va = VirtAddr(_start+_len);
+    let end_va = VirtAddr(_start + _len);
 
+    // 都不存在的返回 0
     if memory_set.check_memory_mapped(start_va.floor(), end_va.ceil()){
-        retrun -1
-    }else{
         memory_set.insert_framed_area(start_va, end_va, perm);
         return 0;
+    }else{
+        return -1;
     }
     -1
 }
@@ -178,10 +179,15 @@ pub fn sys_munmap(_start: usize, _len: usize) -> isize {
     if !start_va.aligned() {
         return -1;
     }
-    let end_va = VirtAddr(_start+_len);
-
-
+    let end_va = VirtAddr(_start + _len);
     
+    // 都存在的返回 0
+    if memory_set.check_memory_unmapped(start_va.floor(), end_va.ceil()){
+        memory_set.free_framed_area(start_va, end_va);
+        return 0;
+    }else{
+        return -1;
+    }
     -1
 }
 

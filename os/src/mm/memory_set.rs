@@ -61,6 +61,14 @@ impl MemorySet {
             None,
         );
     }
+
+
+    /// remove some area
+    pub fn free_framed_area(&mut self, start_va: VirtAddr, end_va: VirtAddr){
+        
+    }
+
+
     /// remove a area
     pub fn remove_area_with_start_vpn(&mut self, start_vpn: VirtPageNum) {
         if let Some((idx, area)) = self
@@ -302,20 +310,32 @@ impl MemorySet {
         }
     }
 
-    /// check the area from start_va to end_va whether is true or not
+    /// 都不存在
     pub fn check_memory_mapped(&mut self, start_va: VirtPageNum, end_va: VirtPageNum) -> bool{
         let mut point_va = start_va;
-        while(point_va <= start_va) {
+        while(point_va < start_va) {
             if( self.page_table.find_pte_mmap(point_va)){
-                return true; // find mapped memory
+                return false;
             }else{
                 point_va.step();
             }
         }
-        return false; // not find mapped memory
+        return true; // 都存在
     }
 
 
+    /// 都存在
+    pub fn  check_memory_unmapped(&mut self, start_va: VirtPageNum, end_va: VirtPageNum) -> bool {
+        let mut point_va = start_va;
+        while(point_va < start_va) {
+            if( !self.page_table.find_pte_mmap(point_va)){
+                return false;  
+            }else{
+                point_va.step();
+            }
+        }
+        return true; // 都存在
+    }
 
 
 }
