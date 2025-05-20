@@ -159,6 +159,15 @@ impl PageTable {
         8usize << 60 | self.root_ppn.0
     }
 
+
+    /// find pte by VPN
+    pub fn find_pte_mmap(&mut self, vpn:VirtPageNum) -> bool {
+        if let Some(_pte) = self.find_pte(vpn){
+            return _pte.is_valid();
+        }
+        return false;
+    }
+
 }
 
 /// Translate&Copy a ptr[u8] array with LENGTH len to a mutable u8 Vec through page table
@@ -216,7 +225,3 @@ pub fn translated_refmut<T>(token: usize, ptr: *mut T) -> &'static mut T {
 }
 
 
-/// find pte by VPN
-pub fn find_pte(vpn:VirtPageNum) -> bool {
-    if let Some(pte) = 
-}

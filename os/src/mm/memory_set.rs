@@ -306,7 +306,7 @@ impl MemorySet {
     pub fn check_memory_mapped(&mut self, start_va: VirtPageNum, end_va: VirtPageNum) -> bool{
         let mut point_va = start_va;
         while(point_va <= start_va) {
-            if( self.page_table.find_pte(point_va )){
+            if( self.page_table.find_pte_mmap(point_va)){
                 return true; // find mapped memory
             }else{
                 point_va.step();

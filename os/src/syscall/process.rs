@@ -172,6 +172,15 @@ pub fn sys_munmap(_start: usize, _len: usize) -> isize {
         "kernel:pid[{}] sys_munmap NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
+    let task = current_task().unwrap();
+    let memory_set = &mut task.inner_exclusive_access().memory_set;
+    let start_va = VirtAddr::from(_start);
+    if !start_va.aligned() {
+        return -1;
+    }
+    let end_va = VirtAddr(_start+_len);
+
+
     
     -1
 }
