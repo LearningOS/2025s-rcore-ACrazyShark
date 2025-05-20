@@ -8,9 +8,6 @@ use crate::{
         add_task, current_task, current_user_token, exit_current_and_run_next,
         suspend_current_and_run_next,
     }, timer::get_time_us,
-    config::{
-        PAGE_SIZE
-    }
 };
 
 #[repr(C)]
@@ -164,7 +161,6 @@ pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
     }else{
         return -1;
     }
-    -1
 }
 
 /// YOUR JOB: Implement munmap.
@@ -183,12 +179,15 @@ pub fn sys_munmap(_start: usize, _len: usize) -> isize {
     
     // 都存在的返回 0
     if memory_set.check_memory_unmapped(start_va.floor(), end_va.ceil()){
-        memory_set.free_framed_area(start_va, end_va);
-        return 0;
+        if memory_set.free_framed_area(start_va, end_va) {
+            return 0
+        }else{
+            return -1;
+        }
     }else{
         return -1;
     }
-    -1
+
 }
 
 /// change data segment size
@@ -208,7 +207,17 @@ pub fn sys_spawn(_path: *const u8) -> isize {
         "kernel:pid[{}] sys_spawn NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    -1
+    let token = current_user_token();
+    let path = translated_str(token, _path);
+    if let Some(app_data) = get_app_data_by_name(path.as_str()) {
+        let task = current_task().unwrap();
+        let child_task = task.task_spawn(app_data);
+        let pid = child_task.pid.0 as isize;
+        add_task(child_task);
+        pid
+    } else {
+        -1
+    }
 }
 
 // YOUR JOB: Set task priority.
@@ -217,5 +226,12 @@ pub fn sys_set_priority(_prio: isize) -> isize {
         "kernel:pid[{}] sys_set_priority NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    -1
+    if _prio < 2 { return -1; }
+    
+    let current = current_task().unwrap();
+    let mut inner = current.inner_exclusive_access();
+    inner.priority = _prio as usize;
+    // inner.pass = BIG_STRIDE / inner.priority as u64;
+    
+    _prio
 }

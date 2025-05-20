@@ -1,5 +1,5 @@
 //! Implementation of [`MapArea`] and [`MemorySet`].
-use super::{frame_alloc, page_table, FrameTracker};
+use super::{frame_alloc, FrameTracker};
 use super::{PTEFlags, PageTable, PageTableEntry};
 use super::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum};
 use super::{StepByOne, VPNRange};
@@ -11,7 +11,6 @@ use alloc::vec::Vec;
 use core::arch::asm;
 use lazy_static::*;
 use riscv::register::satp;
-pub use page_table::{find_pte};
 
 extern "C" {
     fn stext();
@@ -64,8 +63,17 @@ impl MemorySet {
 
 
     /// remove some area
-    pub fn free_framed_area(&mut self, start_va: VirtAddr, end_va: VirtAddr){
-        
+    pub fn free_framed_area(&mut self, start_va: VirtAddr, end_va: VirtAddr) -> bool{
+        let mut is_unmapped = false;
+        for area in self.areas.iter_mut() {
+            if area.vpn_range.get_start() == start_va.floor() 
+                && area.vpn_range.get_end() == end_va.ceil() 
+            {
+                area.unmap(&mut self.page_table);
+                is_unmapped = true;
+            }
+        }
+        is_unmapped
     }
 
 
@@ -311,13 +319,13 @@ impl MemorySet {
     }
 
     /// 都不存在
-    pub fn check_memory_mapped(&mut self, start_va: VirtPageNum, end_va: VirtPageNum) -> bool{
-        let mut point_va = start_va;
-        while(point_va < start_va) {
-            if( self.page_table.find_pte_mmap(point_va)){
+    pub fn check_memory_mapped(&mut self, start_vpn: VirtPageNum, end_vpn: VirtPageNum) -> bool{
+        let mut point_vpn = start_vpn;
+        while point_vpn < end_vpn {
+            if self.page_table.find_pte_mmap(point_vpn) {
                 return false;
             }else{
-                point_va.step();
+                point_vpn.step();
             }
         }
         return true; // 都存在
@@ -325,13 +333,13 @@ impl MemorySet {
 
 
     /// 都存在
-    pub fn  check_memory_unmapped(&mut self, start_va: VirtPageNum, end_va: VirtPageNum) -> bool {
-        let mut point_va = start_va;
-        while(point_va < start_va) {
-            if( !self.page_table.find_pte_mmap(point_va)){
+    pub fn  check_memory_unmapped(&mut self, start_vpn: VirtPageNum, end_vpn: VirtPageNum) -> bool {
+        let mut point_vpn = start_vpn;
+        while point_vpn < end_vpn {
+            if !self.page_table.find_pte_mmap(point_vpn) {
                 return false;  
             }else{
-                point_va.step();
+                point_vpn.step();
             }
         }
         return true; // 都存在
