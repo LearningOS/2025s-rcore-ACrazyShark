@@ -1,5 +1,5 @@
 use crate::task::{current_user_token, exit_current_and_run_next, suspend_current_and_run_next};
-use crate::mm::{MapPermission, VirtAddr, translated_refmut};
+use crate::mm::{MapPermission, VirtAddr, translated_refmut, translated_str};
 use crate::task::{check_user_addr_range, get_syscall_count, insert_framed_area, free_framed_area};
 // use crate::timer::{get_time_us};
 use crate::config::{PAGE_SIZE};
