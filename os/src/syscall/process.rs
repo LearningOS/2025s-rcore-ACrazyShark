@@ -35,20 +35,8 @@ pub fn sys_yield() -> isize {
 /// HINT: What if [`TimeVal`] is splitted by two pages ?
 pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
     trace!("kernel: sys_get_time"); 
-    // let time_us = get_time_us();
-    // unsafe { 
-    //     *_ts = TimeVal {
-    //         sec: time_us / 1_000_000,
-    //         usec: time_us % 1_000_000,
-    //     };
-    // }
     let time_us = get_time_us();
     let token = current_user_token();
-    // let page_table = PageTable::from_token(token);
-    // let va = VirtAddr::from(_ts as usize);
-    // let ppn = page_table.translate(va.floor()).unwrap().ppn();
-    // let offset = va.page_offset();
-    // let phy_addr = (ppn.0 << PAGE_SIZE_BITS + offset) as *mut TimeVal;
     let phy_addr = translated_refmut(token, _ts);
 
     *phy_addr = TimeVal {
@@ -124,13 +112,13 @@ pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
     let start_va = VirtAddr::from(_start);
     let end_va = VirtAddr::from(_start + _len);
 
-    // check_vpn_range(start_va, end_va, perm);
-
-    insert_framed_area(
-        start_va,
-        end_va,
-        perm,
-    );
+    if check_vpn_range(start_va, end_va){
+        insert_framed_area(
+            start_va,
+            end_va,
+            perm,
+        );
+    }
 
     0
     // -1

@@ -117,7 +117,7 @@ impl PageTable {
         result
     }
     /// Find PageTableEntry by VirtPageNum
-    fn find_pte(&self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
+    fn find_pte(& self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
         let idxs = vpn.indexes();
         let mut ppn = self.root_ppn;
         let mut result: Option<&mut PageTableEntry> = None;
@@ -168,6 +168,8 @@ impl PageTable {
             (aligned_pa_usize + offset).into()
         })
     }
+
+
 }
 
 /// Translate&Copy a ptr[u8] array with LENGTH len to a mutable u8 Vec through page table
@@ -205,3 +207,12 @@ pub fn translated_refmut<T>(token: usize, ptr: *mut T) -> &'static mut T {
         .unwrap()
         .get_mut()
 }
+
+// /// find the pte to check the range of va
+// pub fn find_pte(token: usize, vpn: VirtPageNum) -> bool{
+//     let page_table = PageTable::from_token(token);
+//     if let Some(_pte) = page_table.find_pte(vpn){
+//         return true;
+//     }
+//     return false
+// }

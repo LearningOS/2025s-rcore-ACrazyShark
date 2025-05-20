@@ -16,11 +16,13 @@ mod task;
 
 // use core::simd::usizex2;
 
+use core::f32::consts::E;
+
 // use crate::config::PAGE_SIZE;
 use crate::loader::{get_app_data, get_num_app};
 use crate::sync::UPSafeCell;
 use crate::trap::TrapContext;
-use crate::mm::{VirtAddr, PageTable, MapPermission};
+use crate::mm::{MapPermission, PageTable, VirtAddr, VirtPageNum};
 
 use alloc::vec::Vec;
 use lazy_static::*;
@@ -243,11 +245,15 @@ impl TaskManager {
 
 
     
-    // fn check_vpn_range(&self, start: VirtAddr, end: VirtAddr, perm: MapPermission) -> bool {
-    //     let mut inner = self.inner.exclusive_access();
-    //     let current = inner.current_task;
-    //     false
-    // }
+    fn check_vpn_range(&self, start_va: VirtAddr, end_va: VirtAddr) -> bool {
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        let memory_set = inner.tasks[current].memory_set;
+        let vpn_range = VPNRange::new(start_va.floor(), end_va.ceil());
+        for vpn in vpn_range {
+            
+        }
+    }
 
     
 }
@@ -337,5 +343,8 @@ pub fn insert_framed_area(
     TASK_MANAGER.insert_framed_area(start, end, perm);
 }
 
-
+/// check vpn range
+pub fn check_vpn_range(start_va:VirtAddr, end_va:VirtAddr) -> bool {
+    TASK_MANAGER.check_vpn_range(start_va, end_va)
+}
 
