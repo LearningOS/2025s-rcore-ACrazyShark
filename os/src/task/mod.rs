@@ -30,7 +30,6 @@ pub use task::{TaskControlBlock, TaskStatus};
 pub use context::TaskContext;
 
 use crate::config::PAGE_SIZE_BITS;
-use crate::config::PAGE_SIZE;
 
 /// The task manager, where all the tasks are managed.
 ///
@@ -192,30 +191,26 @@ impl TaskManager {
 
     /// read
     pub fn translate_read(&self, _id: usize) -> isize{
-        let inner = self.inner.exclusive_access();
-        let current = inner.current_task;
-        let page_table = PageTable::from_token(inner.tasks[current].get_user_token());
+        let page_table = PageTable::from_token(current_user_token());
         let va = VirtAddr::from(_id);
         let offset = va.page_offset();
         // how to know the physics address ?
         let ppn = page_table.translate(va.floor())
                 .unwrap()
-                .ppn() ;
-        let pa = (ppn.0 << PAGE_SIZE_BITS + offset)  as *const u8;
+                .ppn().0 ;
+        let pa = ((ppn << PAGE_SIZE_BITS) + offset)  as *const u8;
         unsafe { pa.read_volatile() as isize }
     }
 
     /// write
     pub fn translate_write(&self, _id: usize, value:u8){
-        let inner = self.inner.exclusive_access();
-        let current = inner.current_task;
-        let page_table = PageTable::from_token(inner.tasks[current].get_user_token());
+        let page_table = PageTable::from_token(current_user_token());
         let va = VirtAddr::from(_id);
         let offset = va.page_offset();
         let ppn = page_table.translate(va.floor())
                 .unwrap()
-                .ppn() ;
-        let pa = (ppn.0 << PAGE_SIZE + offset) as *mut u8;
+                .ppn().0 ;
+        let pa = ((ppn << PAGE_SIZE_BITS) + offset) as *mut u8;
         unsafe { pa.write_volatile(value);}
     }
 
@@ -266,8 +261,10 @@ impl TaskManager {
     }
 
     /// free framed area
-    fn free_framed_area(&self, start_va: VirtAddr, end_va:VirtAddr) {
-        free_framed_area(start_va, end_va);
+    fn free_framed_area(&self, start_va: VirtAddr, end_va:VirtAddr) -> bool {
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        inner.tasks[current].free_framed_area(start_va, end_va)
     }
 
     
@@ -369,6 +366,6 @@ pub fn check_vpn_range_munmap(start_va:VirtAddr, end_va:VirtAddr) -> bool {
 }
 
 /// free the area of user
-pub fn free_framed_area(start_va:VirtAddr, end_va:VirtAddr) {
-    TASK_MANAGER.free_framed_area(start_va, end_va);
+pub fn free_framed_area(start_va:VirtAddr, end_va:VirtAddr) -> bool {
+    TASK_MANAGER.free_framed_area(start_va, end_va)
 }

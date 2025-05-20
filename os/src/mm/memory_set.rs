@@ -269,12 +269,17 @@ impl MemorySet {
     /// check vpn range 
     pub fn check_vpn_range(&self, start_va: VirtAddr, end_va: VirtAddr) -> bool {
         let token = self.token();
+        // println!("mmap >> start : {} - end : {}", start_va.0, end_va.0);
+        // println!("mmap >> start : {} - end : {}", start_va.floor().0, end_va.ceil().0);
         for vpn in VPNRange::new(start_va.floor(), end_va.ceil()) {
             if find_pte(token, vpn) {
                 // find a existed page, return false
+                println!("mmap check vpn {} is false", vpn.0);
                 return false;
             }
+            println!("vpn :{} is ok", vpn.0);
         }
+        // println!("mmap check is true");
         true
     }
 
@@ -284,16 +289,41 @@ impl MemorySet {
         for vpn in VPNRange::new(start_va.floor(), end_va.ceil()) {
             if !find_pte(token, vpn) {
                 // find a existed page, return false
+                // println!("munmap check vpn {} is false", vpn.0);
                 return false;
             }
         }
+        // println!("munmap check is true");
         true
     }
     /// free framed area
-    pub fn free_framed_area(&self, start_va:VirtAddr, end_va:VirtAddr) {
-        let token = self.token();
-        let mut page_table = PageTable::from_token(token);
-        MapArea::new(start_va, end_va, MapType::Framed, MapPermission::R | MapPermission::W | MapPermission::U).unmap(&mut page_table);
+    pub fn free_framed_area(&mut self, start_va:VirtAddr, end_va:VirtAddr) -> bool {
+        // let token = self.token();
+        // let mut page_table = PageTable::from_token(token);
+        // let mut is_unmapped = false;
+        // self.areas.iter_mut().for_each(|area|{
+        //     if area.vpn_range.get_start() == start_va.floor() && area.vpn_range.get_end() == end_va.ceil() {
+        //         area.unmap(&mut page_table);
+        //         is_unmapped = true;
+        //     }
+        //     is_unmapped = false;
+        // });
+        // is_unmapped
+        //nMapArea::new(start_va, end_va, MapType::Framed, MapPermission::R | MapPermission::W | MapPermission::U).unmap(&mut page_table);
+            let token = self.token();
+            let mut page_table = PageTable::from_token(token);
+            let mut is_unmapped = false;
+            for area in self.areas.iter_mut() {
+                if area.vpn_range.get_start() == start_va.floor() 
+                    && area.vpn_range.get_end() == end_va.ceil() 
+                {
+                    area.unmap(&mut page_table);
+                    is_unmapped = true;
+                    // 如果确定只有一个匹配区域，可以添加 break 提前退出
+                    // break;
+                }
+            }
+            is_unmapped
     }
 
 }

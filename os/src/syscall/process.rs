@@ -1,12 +1,12 @@
 use crate::task::{current_user_token, exit_current_and_run_next, suspend_current_and_run_next};
-use crate::mm::{MapPermission, VirtAddr, translated_refmut, translated_str};
+use crate::mm::{MapPermission, VirtAddr, translated_refmut};
 use crate::task::{check_user_addr_range, get_syscall_count, insert_framed_area, free_framed_area};
 // use crate::timer::{get_time_us};
-use crate::config::{PAGE_SIZE};
 use crate::timer::get_time_us;
 // use crate::mm::PageTable;
 use crate::task::change_program_brk;
 use crate::task::{check_vpn_range, check_vpn_range_munmap};
+use crate::task::{translate_read, translate_write};
 
 
 #[repr(C)]
@@ -62,13 +62,7 @@ pub fn sys_trace(_trace_request: usize, _id: usize, _data: usize) -> isize {
                 return -1;
             }
 
-            // translate_read(_id)
-            let ptr = _id as *mut u8;
-            let token = current_user_token();
-            if let Some(pa) = translated_refmut::<u8>(token, ptr){
-                unsafe { pa.read_volatile() as isize }
-            }
-            -1
+            translate_read(_id)
 
         },
         1 => {
@@ -80,14 +74,8 @@ pub fn sys_trace(_trace_request: usize, _id: usize, _data: usize) -> isize {
             }
 
             let value = (_data & 0xFF) as u8;
-            //translate_write(_id, value);
-            let ptr = _id as *mut u8;
-            let token = current_user_token();
-            if let Some(pa) = translated_refmut::<u8>(token, ptr){
-                unsafe { pa.write_volatile(value); }
-                return 0
-            }
-            -1
+            translate_write(_id, value);
+            0
         },
         2 =>{
             let num = get_syscall_count(_id);
@@ -100,10 +88,8 @@ pub fn sys_trace(_trace_request: usize, _id: usize, _data: usize) -> isize {
 // YOUR JOB: Implement mmap.
 pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
     trace!("kernel: sys_mmap NOT IMPLEMENTED YET!");
+
     if (_port & !0x7) != 0 || (_port & 0x7) == 0 {
-        return -1;
-    }
-    if _start % PAGE_SIZE != 0 {
         return -1;
     }
     let r = (_port & 0x1) != 0;
@@ -126,6 +112,9 @@ pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
     let start_va = VirtAddr::from(_start);
     let end_va = VirtAddr::from(_start + _len);
 
+    if !start_va.aligned() {
+        return -1;
+    }
     if check_vpn_range(start_va, end_va){
         insert_framed_area(
             start_va,
@@ -133,8 +122,9 @@ pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
             perm,
         );
         return 0;
+    }else{
+        println!("check failed!");
     }
-
     -1
 }
 
@@ -143,14 +133,18 @@ pub fn sys_munmap(_start: usize, _len: usize) -> isize {
     trace!("kernel: sys_munmap NOT IMPLEMENTED YET!");
     
     let start_va = VirtAddr::from(_start);
+    
+    if !start_va.aligned() {
+        return -1;
+    }
     let end_va = VirtAddr::from(_start + _len);
-
     if check_vpn_range_munmap(start_va, end_va){
-        free_framed_area(
+        if free_framed_area(
             start_va,
             end_va,
-        );
-        return 0;
+        ) {
+            return 0;
+        }
     }
     -1
 }

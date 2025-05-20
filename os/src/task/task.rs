@@ -109,6 +109,13 @@ impl TaskControlBlock {
         self.memory_set.insert_framed_area(start, end, perm);
     }
 
+    /// free framed area
+    pub fn free_framed_area(&mut self, start: VirtAddr, end: VirtAddr) -> bool {
+        let start = VirtAddr::from(start);
+        let end = VirtAddr::from(end);
+        self.memory_set.free_framed_area(start, end)
+    }
+
 }
 
 #[derive(Copy, Clone, PartialEq)]
