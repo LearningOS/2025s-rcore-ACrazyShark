@@ -14,15 +14,12 @@ mod switch;
 #[allow(clippy::module_inception)]
 mod task;
 
-// use core::simd::usizex2;
-
-use core::f32::consts::E;
 
 // use crate::config::PAGE_SIZE;
 use crate::loader::{get_app_data, get_num_app};
 use crate::sync::UPSafeCell;
 use crate::trap::TrapContext;
-use crate::mm::{MapPermission, PageTable, VirtAddr, VirtPageNum};
+use crate::mm::{MapPermission, PageTable, VirtAddr};
 
 use alloc::vec::Vec;
 use lazy_static::*;
@@ -244,16 +241,33 @@ impl TaskManager {
     }
 
 
-    
+    /// check vpn 
     fn check_vpn_range(&self, start_va: VirtAddr, end_va: VirtAddr) -> bool {
-        let mut inner = self.inner.exclusive_access();
+        let inner = self.inner.exclusive_access();
         let current = inner.current_task;
-        let memory_set = inner.tasks[current].memory_set;
+        let memory_set = &inner.tasks[current].memory_set;
 
         if memory_set.check_vpn_range(start_va, end_va) {
             return true;
         }
         false
+    }
+
+    /// check vpn for munmap
+    fn check_vpn_range_munmap(&self, start_va: VirtAddr, end_va:VirtAddr) -> bool {
+        let inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        let memory_set = &inner.tasks[current].memory_set;
+
+        if memory_set.check_vpn_range_munmap(start_va, end_va) {
+            return true;
+        }
+        false
+    }
+
+    /// free framed area
+    fn free_framed_area(&self, start_va: VirtAddr, end_va:VirtAddr) {
+        free_framed_area(start_va, end_va);
     }
 
     
@@ -349,3 +363,12 @@ pub fn check_vpn_range(start_va:VirtAddr, end_va:VirtAddr) -> bool {
     TASK_MANAGER.check_vpn_range(start_va, end_va)
 }
 
+/// check vpn for munmap
+pub fn check_vpn_range_munmap(start_va:VirtAddr, end_va:VirtAddr) -> bool {
+    TASK_MANAGER.check_vpn_range_munmap(start_va, end_va)
+}
+
+/// free the area of user
+pub fn free_framed_area(start_va:VirtAddr, end_va:VirtAddr) {
+    TASK_MANAGER.free_framed_area(start_va, end_va);
+}

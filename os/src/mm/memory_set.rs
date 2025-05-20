@@ -15,7 +15,7 @@ use core::arch::asm;
 use core::u8;
 use lazy_static::*;
 use riscv::register::satp;
-
+ use crate::mm::page_table::find_pte;
 
 extern "C" {
     fn stext();
@@ -266,7 +266,7 @@ impl MemorySet {
     }
 
 
-
+    /// check vpn range 
     pub fn check_vpn_range(&self, start_va: VirtAddr, end_va: VirtAddr) -> bool {
         let token = self.token();
         for vpn in VPNRange::new(start_va.floor(), end_va.ceil()) {
@@ -276,6 +276,24 @@ impl MemorySet {
             }
         }
         true
+    }
+
+    /// check vpn for munmap
+    pub fn check_vpn_range_munmap(&self, start_va: VirtAddr, end_va: VirtAddr) -> bool {
+        let token = self.token();
+        for vpn in VPNRange::new(start_va.floor(), end_va.ceil()) {
+            if !find_pte(token, vpn) {
+                // find a existed page, return false
+                return false;
+            }
+        }
+        true
+    }
+    /// free framed area
+    pub fn free_framed_area(&self, start_va:VirtAddr, end_va:VirtAddr) {
+        let token = self.token();
+        let mut page_table = PageTable::from_token(token);
+        MapArea::new(start_va, end_va, MapType::Framed, MapPermission::R | MapPermission::W | MapPermission::U).unmap(&mut page_table);
     }
 
 }

@@ -6,6 +6,7 @@ use alloc::vec::Vec;
 use bitflags::*;
 use crate::mm::PhysAddr;
 
+
 bitflags! {
     /// page table entry flags
     pub struct PTEFlags: u8 {
@@ -197,15 +198,20 @@ pub fn translated_byte_buffer(token: usize, ptr: *const u8, len: usize) -> Vec<&
 
 
 /// Translate a ptr[u8] array through page table and return a mutable reference of T
-pub fn translated_refmut<T>(token: usize, ptr: *mut T) -> &'static mut T {
-    //trace!("into translated_refmut!");
+pub fn translated_refmut<T>(token: usize, ptr: *mut T) -> Option<&'static mut T> {
+    // //trace!("into translated_refmut!");
     let page_table = PageTable::from_token(token);
     let va = ptr as usize;
-    //trace!("translated_refmut: before translate_va");
-    page_table
-        .translate_va(VirtAddr::from(va))
-        .unwrap()
-        .get_mut()
+    // //trace!("translated_refmut: before translate_va");
+    // page_table
+    //     .translate_va(VirtAddr::from(va))
+    //     .unwrap()
+    //     .get_mut()
+    if let Some(pa) = page_table.translate_va(VirtAddr::from(va)) {
+        Some(pa.get_mut::<T>())
+    } else {
+        None
+    }
 }
 
 /// find the pte to check the range of va
@@ -216,3 +222,5 @@ pub fn find_pte(token: usize, vpn: VirtPageNum) -> bool{
     }
     return false
 }
+
+
