@@ -265,6 +265,11 @@ impl MemorySet {
     }
 
 
+
+    pub fn check_vpn_range(&self, start_va: VirtAddr, end_va: VirtAddr) {
+        
+    }
+
 }
 /// map area structure, controls a contiguous piece of virtual memory
 pub struct MapArea {

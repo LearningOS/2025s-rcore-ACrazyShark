@@ -249,10 +249,10 @@ impl TaskManager {
         let mut inner = self.inner.exclusive_access();
         let current = inner.current_task;
         let memory_set = inner.tasks[current].memory_set;
-        let vpn_range = VPNRange::new(start_va.floor(), end_va.ceil());
-        for vpn in vpn_range {
-            
+        if memory_set.check_vpn_range() {
+            return true;
         }
+        false;
     }
 
     
