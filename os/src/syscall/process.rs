@@ -1,13 +1,15 @@
 //! Process management syscalls
+use core::ptr::metadata;
+
 use alloc::sync::Arc;
 
 use crate::{
     loader::get_app_data_by_name,
-    mm::{translated_refmut, translated_str},
+    mm::{translated_refmut, translated_str, VirtAddr},
     task::{
         add_task, current_task, current_user_token, exit_current_and_run_next,
         suspend_current_and_run_next,
-    },
+    }, timer::get_time_us,
 };
 
 #[repr(C)]
@@ -111,12 +113,13 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
         current_task().unwrap().pid.0
     );
     let token = current_user_token();
-    let time = translated_refmut(token, _ts);
-    *time = TimeVal{
-        sec:
-        usec:
-    } ;
-    -1
+    let time_addr = translated_refmut(token, _ts);
+    let time_us = get_time_us();
+    *time_addr = TimeVal {
+        sec: time_us / 1_000_000,
+        usec: time_us % 1_000_000,
+    };
+    0
 }
 
 /// YOUR JOB: Implement mmap.
@@ -125,6 +128,12 @@ pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
         "kernel:pid[{}] sys_mmap NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
+    let task = current_task().unwrap().inner_exclusive_access();
+    let memory_set = task.memory_set;
+    let start_va = VirtAddr::from(_start);
+    let end_va = VirtAddr(_start+_len);
+    
+    memory_set.insert_framed_area(start_va, end_va, permission);
     -1
 }
 
@@ -134,6 +143,7 @@ pub fn sys_munmap(_start: usize, _len: usize) -> isize {
         "kernel:pid[{}] sys_munmap NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
+
     -1
 }
 
