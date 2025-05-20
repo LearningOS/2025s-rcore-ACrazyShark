@@ -1,5 +1,5 @@
 //! Implementation of [`MapArea`] and [`MemorySet`].
-use super::{frame_alloc, FrameTracker};
+use super::{frame_alloc, page_table, FrameTracker};
 use super::{PTEFlags, PageTable, PageTableEntry};
 use super::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum};
 use super::{StepByOne, VPNRange};
@@ -11,6 +11,7 @@ use alloc::vec::Vec;
 use core::arch::asm;
 use lazy_static::*;
 use riscv::register::satp;
+pub use page_table::{find_pte};
 
 extern "C" {
     fn stext();
@@ -300,6 +301,23 @@ impl MemorySet {
             false
         }
     }
+
+    /// check VirtAddr whether is exited
+    pub fn check_virtaddr_exited(&mut self, start_va: VirtAddr, end_va: VirtAddr) -> bool {
+        let token = self.token();
+        for vpn in VPNRange::new(start_va.floor(), end_va.ceil()) {
+            if find_pte(token, vpn) {
+                // find a existed page, return false
+                return false;
+            }
+        }
+        true
+    }
+
+
+
+
+
 }
 /// map area structure, controls a contiguous piece of virtual memory
 pub struct MapArea {

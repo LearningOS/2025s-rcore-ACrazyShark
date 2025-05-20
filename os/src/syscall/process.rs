@@ -1,15 +1,16 @@
 //! Process management syscalls
-use core::ptr::metadata;
-
 use alloc::sync::Arc;
 
 use crate::{
     loader::get_app_data_by_name,
-    mm::{translated_refmut, translated_str, VirtAddr},
+    mm::{translated_refmut, translated_str, VirtAddr, MapPermission},
     task::{
         add_task, current_task, current_user_token, exit_current_and_run_next,
         suspend_current_and_run_next,
     }, timer::get_time_us,
+    config::{
+        PAGE_SIZE
+    }
 };
 
 #[repr(C)]
@@ -128,12 +129,36 @@ pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
         "kernel:pid[{}] sys_mmap NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    let task = current_task().unwrap().inner_exclusive_access();
-    let memory_set = task.memory_set;
+    if (_port & !0x7) != 0 || (_port & 0x7) == 0 {
+        return -1;
+    }
+    if _start % PAGE_SIZE != 0 {
+        return -1;
+    }
+    let r = (_port & 0x1) != 0;
+    let w = (_port & 0x2) != 0;
+    let x = (_port & 0x4) != 0;
+    let mut perm = MapPermission::U;
+    if r {
+        perm |= MapPermission::R;
+    }
+    if w {
+        perm |= MapPermission::W;
+    }
+    if x {
+        perm |= MapPermission::X;
+    }
+    if _len == 0 {
+        return 0;
+    }
+    let binding = current_task().unwrap();
+    let memory_set = &mut binding.inner_exclusive_access().memory_set;
     let start_va = VirtAddr::from(_start);
     let end_va = VirtAddr(_start+_len);
-    
-    memory_set.insert_framed_area(start_va, end_va, permission);
+    if memory_set.check_virtaddr_exited(start_va, end_va){
+        memory_set.insert_framed_area(start_va, end_va, perm);
+        return 0
+    };
     -1
 }
 
@@ -143,7 +168,7 @@ pub fn sys_munmap(_start: usize, _len: usize) -> isize {
         "kernel:pid[{}] sys_munmap NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-
+    
     -1
 }
 
