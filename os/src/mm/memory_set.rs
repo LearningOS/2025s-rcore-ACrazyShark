@@ -302,18 +302,18 @@ impl MemorySet {
         }
     }
 
-    /// check VirtAddr whether is exited
-    pub fn check_virtaddr_exited(&mut self, start_va: VirtAddr, end_va: VirtAddr) -> bool {
-        let token = self.token();
-        for vpn in VPNRange::new(start_va.floor(), end_va.ceil()) {
-            if find_pte(token, vpn) {
-                // find a existed page, return false
-                return false;
+    /// check the area from start_va to end_va whether is true or not
+    pub fn check_memory_mapped(&mut self, start_va: VirtPageNum, end_va: VirtPageNum) -> bool{
+        let mut point_va = start_va;
+        while(point_va <= start_va) {
+            if( self.page_table.find_pte(point_va )){
+                return true; // find mapped memory
+            }else{
+                point_va.step();
             }
         }
-        true
+        return false; // not find mapped memory
     }
-
 
 
 

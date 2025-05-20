@@ -215,11 +215,8 @@ pub fn translated_refmut<T>(token: usize, ptr: *mut T) -> &'static mut T {
         .get_mut()
 }
 
-/// find the pte to check the range of va
-pub fn find_pte(token: usize, vpn: VirtPageNum) -> bool{
-    let page_table = PageTable::from_token(token);
-    if let Some(_pte) = page_table.find_pte(vpn){
-        return true;
-    }
-    return false
+
+/// find pte by VPN
+pub fn find_pte(vpn:VirtPageNum) -> bool {
+    if let Some(pte) = 
 }

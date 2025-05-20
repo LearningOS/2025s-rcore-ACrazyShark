@@ -132,9 +132,6 @@ pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
     if (_port & !0x7) != 0 || (_port & 0x7) == 0 {
         return -1;
     }
-    if _start % PAGE_SIZE != 0 {
-        return -1;
-    }
     let r = (_port & 0x1) != 0;
     let w = (_port & 0x2) != 0;
     let x = (_port & 0x4) != 0;
@@ -151,14 +148,21 @@ pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
     if _len == 0 {
         return 0;
     }
-    let binding = current_task().unwrap();
-    let memory_set = &mut binding.inner_exclusive_access().memory_set;
+    
+    let task = current_task().unwrap();
+    let memory_set = &mut task.inner_exclusive_access().memory_set;
     let start_va = VirtAddr::from(_start);
+    if !start_va.aligned() {
+        return -1;
+    }
     let end_va = VirtAddr(_start+_len);
-    if memory_set.check_virtaddr_exited(start_va, end_va){
+
+    if memory_set.check_memory_mapped(start_va.floor(), end_va.ceil()){
+        retrun -1
+    }else{
         memory_set.insert_framed_area(start_va, end_va, perm);
-        return 0
-    };
+        return 0;
+    }
     -1
 }
 
