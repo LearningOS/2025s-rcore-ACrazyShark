@@ -52,7 +52,9 @@ pub fn sys_mutex_create(blocking: bool) -> isize {
         id as isize
     } else {
         process_inner.mutex_list.push(mutex);
-        process_inner.mutex_list.len() as isize - 1
+        let id = process_inner.mutex_list.len() as isize - 1;
+        process_inner.banker_mutex.set_max_available(id as usize, 1);
+        id
     }
 }
 /// mutex lock syscall
@@ -68,14 +70,47 @@ pub fn sys_mutex_lock(mutex_id: usize) -> isize {
             .unwrap()
             .tid
     );
+    let tid = current_task()
+                    .unwrap()
+                    .inner_exclusive_access()
+                    .res
+                    .as_ref()
+                    .unwrap()
+                    .tid;
     let process = current_process();
-    let process_inner = process.inner_exclusive_access();
+    let mut process_inner = process.inner_exclusive_access();
     let mutex = Arc::clone(process_inner.mutex_list[mutex_id].as_ref().unwrap());
+    // drop(process_inner);
+    // drop(process);
+    // mutex.lock();
+
+
+    process_inner.banker_mutex.add_need(tid, mutex_id, 1);
+    if process_inner.is_enable {
+        let is_unsafe = process_inner.banker_mutex.is_unsafe();
+        if is_unsafe {
+            process_inner.banker_mutex.bak_need(tid, mutex_id);
+            return -0xdead;
+        }
+    }
+  
+    // drop(process_inner);
+    // drop(process);
+    // mutex.lock();
     drop(process_inner);
-    drop(process);
+    // drop(process);
     mutex.lock();
+    let process = current_process();
+    let mut process_inner = process.inner_exclusive_access();
+    process_inner.banker_mutex.bak_need(tid, mutex_id);
+    process_inner.banker_mutex.add_allocation(tid, mutex_id, 1);
+    process_inner.banker_mutex.bak_available(tid);
+
+
     0
 }
+
+
 /// mutex unlock syscall
 pub fn sys_mutex_unlock(mutex_id: usize) -> isize {
     trace!(
@@ -92,9 +127,26 @@ pub fn sys_mutex_unlock(mutex_id: usize) -> isize {
     let process = current_process();
     let process_inner = process.inner_exclusive_access();
     let mutex = Arc::clone(process_inner.mutex_list[mutex_id].as_ref().unwrap());
+    // drop(process_inner);
+    // drop(process);
+    // mutex.unlock();
     drop(process_inner);
     drop(process);
-    mutex.unlock();
+    mutex.lock();
+    let tid = current_task()
+                        .unwrap()
+                        .inner_exclusive_access()
+                        .res
+                        .as_ref()
+                        .unwrap()
+                        .tid;
+    let process = current_process();
+    let mut process_inner = process.inner_exclusive_access();
+    
+    process_inner.banker_mutex.add_allocation(tid, mutex_id, 1);
+    process_inner.banker_mutex.bak_available(tid);
+   
+
     0
 }
 /// semaphore create syscall
@@ -112,7 +164,7 @@ pub fn sys_semaphore_create(res_count: usize) -> isize {
     );
     let process = current_process();
     let mut process_inner = process.inner_exclusive_access();
-    let id = if let Some(id) = process_inner
+    let id: usize = if let Some(id) = process_inner
         .semaphore_list
         .iter()
         .enumerate()
@@ -125,8 +177,11 @@ pub fn sys_semaphore_create(res_count: usize) -> isize {
         process_inner
             .semaphore_list
             .push(Some(Arc::new(Semaphore::new(res_count))));
-        process_inner.semaphore_list.len() - 1
+        let id = process_inner.semaphore_list.len() - 1;
+        process_inner.banker_semaphore.set_max_available(id as usize, res_count);
+        id
     };
+
     id as isize
 }
 /// semaphore up syscall
@@ -146,9 +201,26 @@ pub fn sys_semaphore_up(sem_id: usize) -> isize {
     let process_inner = process.inner_exclusive_access();
     let sem = Arc::clone(process_inner.semaphore_list[sem_id].as_ref().unwrap());
     drop(process_inner);
+    drop(process);
     sem.up();
+    let tid = current_task()
+                        .unwrap()
+                        .inner_exclusive_access()
+                        .res
+                        .as_ref()
+                        .unwrap()
+                        .tid;
+    let process = current_process();
+    let mut process_inner = process.inner_exclusive_access();
+ 
+    process_inner.banker_semaphore.bak_allocation(tid, sem_id);
+    process_inner.banker_semaphore.add_available(sem_id, 1);
+
+
     0
 }
+
+
 /// semaphore down syscall
 pub fn sys_semaphore_down(sem_id: usize) -> isize {
     trace!(
@@ -162,13 +234,48 @@ pub fn sys_semaphore_down(sem_id: usize) -> isize {
             .unwrap()
             .tid
     );
+    let tid = current_task()
+                    .unwrap()
+                    .inner_exclusive_access()
+                    .res
+                    .as_ref()
+                    .unwrap()
+                    .tid;
     let process = current_process();
-    let process_inner = process.inner_exclusive_access();
+    let mut process_inner = process.inner_exclusive_access();
     let sem = Arc::clone(process_inner.semaphore_list[sem_id].as_ref().unwrap());
+    // drop(process_inner);
+    // sem.down();
+    // 0
+
+ 
+
+
+    process_inner.banker_semaphore.add_need(tid, sem_id, 1);
+     if process_inner.is_enable {
+        let is_unsafe = process_inner.banker_semaphore.is_unsafe();
+        if is_unsafe {
+            process_inner.banker_semaphore.bak_need(tid, sem_id);
+            return -0xdead;
+        }
+    }
     drop(process_inner);
+    // drop(process);
     sem.down();
+    let process = current_process();
+    let mut process_inner = process.inner_exclusive_access();
+    
+    
+    process_inner.banker_semaphore.bak_need(tid, sem_id);
+    process_inner.banker_semaphore.add_allocation(tid, sem_id, 1);
+    process_inner.banker_mutex.bak_available(sem_id);
     0
+    
 }
+
+
+
+
 /// condvar create syscall
 pub fn sys_condvar_create() -> isize {
     trace!(
@@ -247,5 +354,16 @@ pub fn sys_condvar_wait(condvar_id: usize, mutex_id: usize) -> isize {
 /// YOUR JOB: Implement deadlock detection, but might not all in this syscall
 pub fn sys_enable_deadlock_detect(_enabled: usize) -> isize {
     trace!("kernel: sys_enable_deadlock_detect NOT IMPLEMENTED");
-    -1
+    // enable_deadlock_detect 
+    // is_enable = 1 Implement check
+    // is_enable = 0 Implement check
+    if _enabled == 1 {
+        // Implement check deadlock
+        let process = current_process();
+        let mut inner = process.inner_exclusive_access();
+        inner.is_enable = true; // 开启死锁检测
+        0
+    }else{
+        -1
+    }
 }

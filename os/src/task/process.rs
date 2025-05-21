@@ -14,6 +14,7 @@ use alloc::sync::{Arc, Weak};
 use alloc::vec;
 use alloc::vec::Vec;
 use core::cell::RefMut;
+use super::banker::Banker;
 
 /// Process Control Block
 pub struct ProcessControlBlock {
@@ -49,6 +50,15 @@ pub struct ProcessControlBlockInner {
     pub semaphore_list: Vec<Option<Arc<Semaphore>>>,
     /// condvar list
     pub condvar_list: Vec<Option<Arc<Condvar>>>,
+
+    /// 判断是否使用死锁检测
+    pub is_enable: bool,
+
+    /// 进行死锁检测的 Mutex
+    pub banker_mutex: Banker,
+
+    /// 进行死锁检测的 信号量
+    pub banker_semaphore: Banker,
 }
 
 impl ProcessControlBlockInner {
@@ -119,6 +129,9 @@ impl ProcessControlBlock {
                     mutex_list: Vec::new(),
                     semaphore_list: Vec::new(),
                     condvar_list: Vec::new(),
+                    is_enable: false,
+                    banker_mutex: Banker::new(),
+                    banker_semaphore: Banker::new(),
                 })
             },
         });
@@ -245,6 +258,9 @@ impl ProcessControlBlock {
                     mutex_list: Vec::new(),
                     semaphore_list: Vec::new(),
                     condvar_list: Vec::new(),
+                    is_enable: false,
+                    banker_mutex: Banker::new(),
+                    banker_semaphore: Banker::new(),
                 })
             },
         });
