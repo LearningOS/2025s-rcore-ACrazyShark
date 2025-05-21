@@ -45,7 +45,7 @@ impl Stat {
             dev: 0,
             ino: inode,
             mode,
-            nlink,
+            nlink: nlink,
             pad: [0; 7],
         }
     }

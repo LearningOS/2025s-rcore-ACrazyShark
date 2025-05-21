@@ -4,11 +4,11 @@ use alloc::sync::Arc;
 
 use crate::{
     fs::{open_file, OpenFlags},
-    mm::{translated_refmut, translated_str},
+    mm::{translated_refmut, translated_str, VirtAddr, MapPermission},
     task::{
         add_task, current_task, current_user_token, exit_current_and_run_next,
         suspend_current_and_run_next,
-    },
+    }, timer::get_time_us,
 };
 
 #[repr(C)]
@@ -110,7 +110,14 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
         "kernel:pid[{}] sys_get_time NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    -1
+    let token = current_user_token();
+    let time_addr = translated_refmut(token, _ts);
+    let time_us = get_time_us();
+    *time_addr = TimeVal {
+        sec: time_us / 1_000_000,
+        usec: time_us % 1_000_000,
+    };
+    0
 }
 
 /// YOUR JOB: Implement mmap.
@@ -119,7 +126,41 @@ pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
         "kernel:pid[{}] sys_mmap NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    -1
+    if (_port & !0x7) != 0 || (_port & 0x7) == 0 {
+        return -1;
+    }
+    let r = (_port & 0x1) != 0;
+    let w = (_port & 0x2) != 0;
+    let x = (_port & 0x4) != 0;
+    let mut perm = MapPermission::U;
+    if r {
+        perm |= MapPermission::R;
+    }
+    if w {
+        perm |= MapPermission::W;
+    }
+    if x {
+        perm |= MapPermission::X;
+    }
+    if _len == 0 {
+        return 0;
+    }
+    
+    let task = current_task().unwrap();
+    let memory_set = &mut task.inner_exclusive_access().memory_set;
+    let start_va = VirtAddr::from(_start);
+    if !start_va.aligned() {
+        return -1;
+    }
+    let end_va = VirtAddr(_start + _len);
+
+    // 都不存在的返回 0
+    if memory_set.check_memory_mapped(start_va.floor(), end_va.ceil()){
+        memory_set.insert_framed_area(start_va, end_va, perm);
+        return 0;
+    }else{
+        return -1;
+    }
 }
 
 /// YOUR JOB: Implement munmap.
@@ -128,7 +169,24 @@ pub fn sys_munmap(_start: usize, _len: usize) -> isize {
         "kernel:pid[{}] sys_munmap NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    -1
+    let task = current_task().unwrap();
+    let memory_set = &mut task.inner_exclusive_access().memory_set;
+    let start_va = VirtAddr::from(_start);
+    if !start_va.aligned() {
+        return -1;
+    }
+    let end_va = VirtAddr(_start + _len);
+    
+    // 都存在的返回 0
+    if memory_set.check_memory_unmapped(start_va.floor(), end_va.ceil()){
+        if memory_set.free_framed_area(start_va, end_va) {
+            return 0
+        }else{
+            return -1;
+        }
+    }else{
+        return -1;
+    }
 }
 
 /// change data segment size
@@ -148,7 +206,19 @@ pub fn sys_spawn(_path: *const u8) -> isize {
         "kernel:pid[{}] sys_spawn NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    -1
+    let token = current_user_token();
+    let path = translated_str(token, _path);
+    if let Some(app_data) = open_file(path.as_str(), OpenFlags::RDONLY) {
+        let task = current_task().unwrap();
+        let app_data = app_data.read_all();
+        let app_data = app_data.as_slice();
+        let child_task = task.task_spawn(app_data);
+        let pid = child_task.pid.0 as isize;
+        add_task(child_task);
+        pid
+    } else {
+        -1
+    }
 }
 
 // YOUR JOB: Set task priority.
@@ -157,5 +227,12 @@ pub fn sys_set_priority(_prio: isize) -> isize {
         "kernel:pid[{}] sys_set_priority NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    -1
+        if _prio < 2 { return -1; }
+    
+    let current = current_task().unwrap();
+    let mut inner = current.inner_exclusive_access();
+    inner.priority = _prio as usize;
+    // inner.pass = BIG_STRIDE / inner.priority as u64;
+    
+    _prio
 }

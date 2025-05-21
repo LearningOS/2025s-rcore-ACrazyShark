@@ -5,6 +5,7 @@ use super::{
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use log::error;
 use spin::{Mutex, MutexGuard};
 /// Virtual filesystem layer over easy-fs
 pub struct Inode {
@@ -225,9 +226,11 @@ impl Inode {
 
     /// unlink name
     pub fn unlink_at(&self, name: &str) -> bool {
+ //       error!("unlink_at {}", name);
         let fs = self.fs.lock();
 
         if let Some(old_inode_id) = self.read_disk_inode(|disk_inode|{
+ //           error!("find_inode_id {}", name);
             self.find_inode_id(name, disk_inode)
         }){
             let (block_id, block_offset) = fs.get_disk_inode_pos(old_inode_id);
@@ -257,9 +260,6 @@ impl Inode {
                     }
                 }   
             });
-            let inode=self.find(name).unwrap();
-            inode.clear();
-            block_cache_sync_all();
             return true;
         }else{
             return false;

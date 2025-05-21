@@ -82,8 +82,10 @@ pub fn sys_fstat(_fd: usize, _st: *mut Stat) -> isize {
         "kernel:pid[{}] sys_fstat NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
+    let token = current_user_token();
     let task = current_task().unwrap();
     let inner = task.inner_exclusive_access();
+    
      if _fd >= inner.fd_table.len() {
         return -1;
     }
@@ -91,7 +93,7 @@ pub fn sys_fstat(_fd: usize, _st: *mut Stat) -> isize {
     if let Some(file) = &inner.fd_table[_fd] {
         if let Some(inode) = file.as_any().downcast_ref::<OSInode>() {
             let stat = inode.get_stat();
-            *translated_refmut(current_user_token(), _st) = stat;
+            *translated_refmut(token, _st) = stat;
             return 0; 
         }else{
             return -1;

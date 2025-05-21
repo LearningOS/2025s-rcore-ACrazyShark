@@ -10,6 +10,7 @@ use alloc::sync::{Arc, Weak};
 use alloc::vec;
 use alloc::vec::Vec;
 use core::cell::RefMut;
+use crate::config::INIT_PRIORITY;
 
 /// Task control block structure
 ///
@@ -71,6 +72,12 @@ pub struct TaskControlBlockInner {
 
     /// Program break
     pub program_brk: usize,
+
+    /// stride
+    pub stride: usize,
+
+    /// priority
+    pub priority: usize,
 }
 
 impl TaskControlBlockInner {
@@ -135,6 +142,8 @@ impl TaskControlBlock {
                     ],
                     heap_bottom: user_sp,
                     program_brk: user_sp,
+                    stride: 0,
+                    priority: INIT_PRIORITY,
                 })
             },
         };
@@ -216,6 +225,8 @@ impl TaskControlBlock {
                     fd_table: new_fd_table,
                     heap_bottom: parent_inner.heap_bottom,
                     program_brk: parent_inner.program_brk,
+                    stride: 0,
+                    priority: INIT_PRIORITY,
                 })
             },
         });
@@ -261,6 +272,20 @@ impl TaskControlBlock {
             None
         }
     }
+
+
+     /// spawn 一个子进程
+    pub fn task_spawn(self: &Arc<Self>, app_data: &[u8]) -> Arc<Self> {
+        let child = Arc::new(Self::new(app_data));
+        let mut parent_inner = self.inner_exclusive_access();
+        
+        child.inner_exclusive_access().parent = Some(Arc::downgrade(self));
+
+        parent_inner.children.push(Arc::clone(&child));
+        
+        child
+    }
+
 }
 
 #[derive(Copy, Clone, PartialEq)]

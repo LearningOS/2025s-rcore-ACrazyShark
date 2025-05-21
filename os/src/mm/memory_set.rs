@@ -66,6 +66,22 @@ impl MemorySet {
             None,
         );
     }
+    /// remove some area
+    pub fn free_framed_area(&mut self, start_va: VirtAddr, end_va: VirtAddr) -> bool{
+        let mut is_unmapped = false;
+        for area in self.areas.iter_mut() {
+            if area.vpn_range.get_start() == start_va.floor() 
+                && area.vpn_range.get_end() == end_va.ceil() 
+            {
+                area.unmap(&mut self.page_table);
+                is_unmapped = true;
+            }
+        }
+        is_unmapped
+    }
+
+
+
     /// remove a area
     pub fn remove_area_with_start_vpn(&mut self, start_vpn: VirtPageNum) {
         if let Some((idx, area)) = self
@@ -318,6 +334,39 @@ impl MemorySet {
             false
         }
     }
+
+
+    /// 都不存在
+    pub fn check_memory_mapped(&mut self, start_vpn: VirtPageNum, end_vpn: VirtPageNum) -> bool{
+        let mut point_vpn = start_vpn;
+        while point_vpn < end_vpn {
+            if self.page_table.find_pte_mmap(point_vpn) {
+                return false;
+            }else{
+                point_vpn.step();
+            }
+        }
+        return true; // 都存在
+    }
+
+
+    /// 都存在
+    pub fn  check_memory_unmapped(&mut self, start_vpn: VirtPageNum, end_vpn: VirtPageNum) -> bool {
+        let mut point_vpn = start_vpn;
+        while point_vpn < end_vpn {
+            if !self.page_table.find_pte_mmap(point_vpn) {
+                return false;  
+            }else{
+                point_vpn.step();
+            }
+        }
+        return true; // 都存在
+    }
+
+
+
+
+
 }
 /// map area structure, controls a contiguous piece of virtual memory
 pub struct MapArea {
@@ -418,6 +467,9 @@ impl MapArea {
             current_vpn.step();
         }
     }
+
+
+
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]
