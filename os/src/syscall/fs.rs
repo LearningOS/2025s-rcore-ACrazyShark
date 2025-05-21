@@ -1,7 +1,8 @@
 //! File and filesystem-related syscalls
-use crate::fs::{open_file, OpenFlags, Stat};
-use crate::mm::{translated_byte_buffer, translated_str, UserBuffer};
+use crate::fs::{open_file, OpenFlags, Stat, OSInode};
+use crate::mm::{translated_byte_buffer, translated_str, translated_refmut, UserBuffer};
 use crate::task::{current_task, current_user_token};
+use crate::fs::{link_at, unlink_at};
 
 pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
     trace!("kernel:pid[{}] sys_write", current_task().unwrap().pid.0);
@@ -81,8 +82,26 @@ pub fn sys_fstat(_fd: usize, _st: *mut Stat) -> isize {
         "kernel:pid[{}] sys_fstat NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    -1
+    let task = current_task().unwrap();
+    let inner = task.inner_exclusive_access();
+     if _fd >= inner.fd_table.len() {
+        return -1;
+    }
+    
+    if let Some(file) = &inner.fd_table[_fd] {
+        if let Some(inode) = file.as_any().downcast_ref::<OSInode>() {
+            let stat = inode.get_stat();
+            *translated_refmut(current_user_token(), _st) = stat;
+            return 0; 
+        }else{
+            return -1;
+        }
+    }else{
+        return -1
+    }
+
 }
+
 
 /// YOUR JOB: Implement linkat.
 pub fn sys_linkat(_old_name: *const u8, _new_name: *const u8) -> isize {
@@ -90,7 +109,14 @@ pub fn sys_linkat(_old_name: *const u8, _new_name: *const u8) -> isize {
         "kernel:pid[{}] sys_linkat NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    -1
+    let old_name = translated_str(current_user_token(), _old_name);
+    let new_name = translated_str(current_user_token(), _new_name);
+    println!("old_name: {}, new_name: {}", old_name, new_name);
+    if link_at(old_name.as_str(), new_name.as_str()) {
+        return 0;
+    }else{
+        return -1;
+    }
 }
 
 /// YOUR JOB: Implement unlinkat.
@@ -99,5 +125,10 @@ pub fn sys_unlinkat(_name: *const u8) -> isize {
         "kernel:pid[{}] sys_unlinkat NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    -1
+    let name = translated_str(current_user_token(), _name);
+    if unlink_at(name.as_str()) {
+        return 0;
+    }else{
+        return -1;
+    }
 }
