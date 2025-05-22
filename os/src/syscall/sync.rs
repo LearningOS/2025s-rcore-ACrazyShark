@@ -248,9 +248,6 @@ pub fn sys_semaphore_down(sem_id: usize) -> isize {
     // sem.down();
     // 0
 
- 
-
-
     process_inner.banker_semaphore.add_need(tid, sem_id, 1);
      if process_inner.is_enable {
         let is_unsafe = process_inner.banker_semaphore.is_unsafe();

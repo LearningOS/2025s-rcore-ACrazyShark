@@ -1,6 +1,4 @@
-use alloc::collections::BTreeMap;
-use alloc::vec;
-use alloc::vec::Vec;
+use alloc::collections::{BTreeMap, BTreeSet};
 
 /// Banker
 pub struct Banker {
@@ -81,54 +79,63 @@ impl Banker {
 
     /// 安全检查算法
     pub fn is_unsafe(&self) -> bool {
-        let mut thread_ids = Vec::new();
-        for &thread_id in self.allocation.keys() {
-            if !thread_ids.contains(&thread_id) {
-                thread_ids.push(thread_id);
-            }
-        }
-
-
-
-        for &thread_id in self.need.keys() {
-            if !thread_ids.contains(&thread_id) {
-                thread_ids.push(thread_id);
-            }
-        }
         let mut work = self.available.clone();
-        let mut finish = vec![false; thread_ids.len()];
-        let mut found = true;
-        while found {
+        let mut finish = BTreeMap::new();
+
+        // 获取所有涉及的线程ID
+        let tids: BTreeSet<_> = self.need
+            .keys()
+            .chain(
+                self.allocation.values()
+                    .flat_map(|m| m.keys())
+            )
+            .copied()
+            .collect();
+
+        // 初始化完成状态
+        for &tid in &tids {
+            finish.insert(tid, false);
+        }
+
+        let mut found;
+        loop {
             found = false;
-            for (idx, &thread_id) in thread_ids.iter().enumerate() {
-                if !finish[idx] {
-                    let mut can_allocate = true;
-                    
-                    if let Some(thread_need) = self.need.get(&thread_id) {
-                        for (&res_id, &need_count) in thread_need {
-                            let available_count = *work.get(&res_id).unwrap_or(&0);
-                            if need_count > available_count {
-                                can_allocate = false;
-                                break;
-                            }
+            
+            // 遍历所有线程
+            for &tid in &tids {
+                // 跳过已完成的线程
+                if *finish.get(&tid).unwrap_or(&false) {
+                    continue;
+                }
+
+                // 检查资源需求是否可满足
+                let can_allocate = self.need.get(&tid)
+                    .map(|need_map| 
+                        need_map.iter().all(|(&rid, &need)| 
+                            *work.get(&rid).unwrap_or(&0) >= need
+                        )
+                    )
+                    .unwrap_or(true); // 无需求的线程视为可立即完成
+
+                if can_allocate {
+                    // 回收该线程持有的所有资源
+                    for (rid, alloc_map) in &self.allocation {
+                        if let Some(&alloc) = alloc_map.get(&tid) {
+                            *work.entry(*rid).or_insert(0) += alloc;
                         }
                     }
-                    
-                    if can_allocate {
-                        if let Some(thread_alloc) = self.allocation.get(&thread_id) {
-                            for (&res_id, &alloc_count) in thread_alloc {
-                                *work.entry(res_id).or_insert(0) += alloc_count;
-                            }
-                        }
-                        finish[idx] = true;
-                        found = true;
-                    }
+                    finish.insert(tid, true);
+                    found = true;
                 }
             }
-        }
-        
 
-        finish.iter().any(|&x| !x)
+            if !found {
+                break;
+            }
+        }
+
+        // 检查是否有未完成的线程
+        finish.values().any(|&completed| !completed)
     }
 
 
