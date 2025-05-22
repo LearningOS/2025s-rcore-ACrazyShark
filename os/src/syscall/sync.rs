@@ -88,6 +88,7 @@ pub fn sys_mutex_lock(mutex_id: usize) -> isize {
     process_inner.banker_mutex.add_need(tid, mutex_id, 1);
     if process_inner.is_enable {
         let is_unsafe = process_inner.banker_mutex.is_unsafe();
+        println!( "mutex_id: {}, is_unsafe: {}", mutex_id, is_unsafe);
         if is_unsafe {
             process_inner.banker_mutex.bak_need(tid, mutex_id);
             return -0xdead;
@@ -132,7 +133,7 @@ pub fn sys_mutex_unlock(mutex_id: usize) -> isize {
     // mutex.unlock();
     drop(process_inner);
     drop(process);
-    mutex.lock();
+    mutex.unlock();
     let tid = current_task()
                         .unwrap()
                         .inner_exclusive_access()
@@ -251,6 +252,7 @@ pub fn sys_semaphore_down(sem_id: usize) -> isize {
     process_inner.banker_semaphore.add_need(tid, sem_id, 1);
      if process_inner.is_enable {
         let is_unsafe = process_inner.banker_semaphore.is_unsafe();
+        println!("is_unsafe: {}", is_unsafe);
         if is_unsafe {
             process_inner.banker_semaphore.bak_need(tid, sem_id);
             return -0xdead;
@@ -265,7 +267,7 @@ pub fn sys_semaphore_down(sem_id: usize) -> isize {
     
     process_inner.banker_semaphore.bak_need(tid, sem_id);
     process_inner.banker_semaphore.add_allocation(tid, sem_id, 1);
-    process_inner.banker_mutex.bak_available(sem_id);
+    process_inner.banker_semaphore.bak_available(sem_id);
     0
     
 }
