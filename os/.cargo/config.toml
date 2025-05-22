@@ -12,7 +12,7 @@ registry = "https://github.com/rust-lang/crates.io-index"
 
 # 替换成你偏好的镜像源
 # replace-with = 'sjtu'
-replace-with = 'ustc'
+replace-with ='tuna'
 
 # 清华大学
 [source.tuna]
